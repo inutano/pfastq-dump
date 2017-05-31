@@ -37,6 +37,9 @@ while [[ $# -gt 0 ]]; do
       TMPDIR="${2}"
       shift
       ;;
+    -Z|--stdout
+      STDOUT="true"
+      ;;
     -*|--*)
       OPTIONS="${OPTIONS} ${1}"
       ;;
@@ -107,7 +110,7 @@ parallel_fastq_dump(){
     local d="${td}/${idx}"
     mkdir -p ${d}
 
-    fastq-dump -N ${min} -X ${max} -O ${d} ${OPTIONS} ${sra} &
+    fastq-dump -N ${min} -X ${max} -O ${d} ${OPTIONS} ${sra} 1>&2 &
   done
 
   # Wait subprocesses and collect exit status
@@ -122,16 +125,24 @@ parallel_fastq_dump(){
     exit 1
   else
     files=($(ls "${td}/1"))
-    for fo in "${files[@]}"; do
-      touch "${OUTDIR}/${fo}"
-    done
+
+    # Create empty file to collect splitted fastq reads (if not --stdout)
+    if [[ "${STDOUT}" != "true" ]]; then
+      for fo in "${files[@]}"; do
+        touch "${OUTDIR}/${fo}"
+      done
+    fi
 
     for min_max in "${out[@]}"; do
       local min=`echo ${min_max} | cut -d ',' -f 1`
       local idx=`echo $(($min / $avg + 1))`
 
       for fo in "${files[@]}"; do
-        cat "${td}/${idx}/${fo}" >> "${OUTDIR}/${fo}"
+        if [[ "${STDOUT}" == "true" ]]; then
+          cat "${td}/${idx}/${fo}"
+        else
+          cat "${td}/${idx}/${fo}" >> "${OUTDIR}/${fo}"
+        fi
       done
     done
   fi
