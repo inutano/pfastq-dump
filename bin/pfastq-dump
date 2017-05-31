@@ -1,0 +1,164 @@
+#!/bin/bash
+#  pfastq-dump: parallelize fastq-dump
+#  Original python implementation: https://github.com/rvalieris/parallel-fastq-dump
+
+# pfastq-dump version
+VERSION="0.1.0"
+
+# default tmp/out directory
+TMPDIR="."
+OUTDIR="."
+
+# parse arguments
+while [[ $# -gt 0 ]]; do
+  key=${1}
+  case ${key} in
+    -t|--threads)
+      NTHREADS=${2}
+      shift
+      ;;
+    -s|--sra-id)
+      SRAID="${2}"
+      shift
+      ;;
+    -O|--outdir)
+      OUTDIR="${2}"
+      shift
+      ;;
+    --tmpdir)
+      TMPDIR="${2}"
+      shift
+      ;;
+    -v|--version)
+      print_version
+      exit 0
+      ;;
+    -h|--help)
+      print_help
+      exit 0
+      ;;
+    -*|--*)
+      OPTIONS="${OPTIONS} ${1}"
+      ;;
+    *sra)
+      FPATH="${FPATH} ${1}"
+      ;;
+  esac
+  shift
+done
+
+print_version(){
+  echo "pfastq-dump version $VERSION using fastq-dump " `fastq-dump --version | awk '$1 ~ /^fastq/ { print $3 }'`
+}
+
+print_help(){
+  cat <<EOS
+Usage:
+pfastq-dump --threads <number of threads> [options] <path> [<path>...]
+
+pfastq-dump option:
+-t|--threads         number of threads
+-s|--sra-id          SRA id
+-O|--outdir          output directory
+--tmpdir             temporary directory
+
+Extra arguments will be passed through
+
+Other:
+-v|--version         show version info
+-h|--help            program usage
+EOS
+}
+
+# function to exec multiple fastq dump
+parallel_fastq_dump(){
+  local sra="${1}"
+  local count="${2}"
+  local tmpdir="${3}"
+
+  local sraid=`echo ${sra} | sed -e 's:.sra$::'`
+  local td="${tmpdir}/${sraid}"
+
+  local avg=`echo $((${count} / ${NTHREADS}))`
+  local remain=`echo $((${count} % ${NTHREADS}))`
+
+  local out=()
+  local last=1
+
+  # Calculate blocks per thread
+  for i in $(seq ${NTHREADS}); do
+    local spots=$((${last} + ${avg} -1))
+    if [[ ${i} == ${NTHREADS} ]]; then
+      plus_remain=$((${spots} + ${remain}))
+      out+=("${last},${plus_remain}")
+    else
+      out+=("${last},${spots}")
+    fi
+    last=$((${last} + ${avg}))
+  done
+  echo "blocks: ${out[@]}" >2
+
+  # Run fastq-dump as subprocess
+  for min_max in "${out[@]}"; do
+    local min=`echo ${min_max} | cut -d ',' -f 1`
+    local max=`echo ${min_max} | cut -d ',' -f 2`
+    local idx=`echo $(($min / $avg + 1))`
+
+    local d="${td}/${idx}"
+    mkdir -p ${d}
+
+    fastq-dump -N ${min} -X ${max} -O ${d} ${OPTIONS} ${sra} &
+  done
+
+  # Collect exit status
+  local failure=0
+  for job in `jobs -p`; do
+    wait $job || let "failure+=1"
+  done
+
+  # Marge splitted fastq files
+  if [[ "${failure}" != "0" ]]; then
+    echo "ERROR during decompressing" >2
+    exit 1
+  else
+    files=($(ls "${td}/1"))
+    for fo in "${files[@]}"; do
+      touch "${OUTDIR}/${fo}"
+    done
+
+    for min_max in "${out[@]}"; do
+      local min=`echo ${min_max} | cut -d ',' -f 1`
+      local idx=`echo $(($min / $avg + 1))`
+
+      for fo in "${files[@]}"; do
+        cat "${td}/${idx}/${fo}" >> "${OUTDIR}/${fo}"
+      done
+    done
+  fi
+}
+
+# function to calculate spot count using sra-stat
+calc_spot_count(){
+  local sra="${1}"
+  sra-stat --meta --quick "${sra}" |\
+  cut -d '|' -f 3 |\
+  cut -d ':' -f 1
+}
+
+# main function
+if [[ ! -z "${SRAID}" ]]; then
+  spot_count=`calc_spot_count "${SRAID}"`
+  parallel_fastq_dump "${SRAID}" "${spot_count}"
+
+elif [[ ! -z "${FPATH}" ]]; then
+  tmpdir="${TMPDIR}/pfd.tmp"
+
+  for srafile in FPATH; do
+    spot_count=`calc_spot_count "${srafile}"`
+    parallel_fastq_dump "${srafile}" "${spot_count}" "${tmpdir}"
+  done
+
+else
+  print_help
+  exit 0
+fi
