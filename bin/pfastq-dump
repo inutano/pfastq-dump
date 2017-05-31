@@ -13,12 +13,20 @@ OUTDIR="."
 while [[ $# -gt 0 ]]; do
   key=${1}
   case ${key} in
+    -v|--version)
+      print_version
+      exit 0
+      ;;
+    -h|--help)
+      print_help
+      exit 0
+      ;;
     -t|--threads)
       NTHREADS=${2}
       shift
       ;;
     -s|--sra-id)
-      SRAID="${2}"
+      SRAID=${2}
       shift
       ;;
     -O|--outdir)
@@ -28,14 +36,6 @@ while [[ $# -gt 0 ]]; do
     --tmpdir)
       TMPDIR="${2}"
       shift
-      ;;
-    -v|--version)
-      print_version
-      exit 0
-      ;;
-    -h|--help)
-      print_help
-      exit 0
       ;;
     -*|--*)
       OPTIONS="${OPTIONS} ${1}"
@@ -76,7 +76,7 @@ parallel_fastq_dump(){
   local count="${2}"
   local tmpdir="${3}"
 
-  local sraid=`echo ${sra} | sed -e 's:.sra$::'`
+  local sraid=`basename ${sra} | sed -e 's:.sra$::'`
   local td="${tmpdir}/${sraid}"
 
   local avg=`echo $((${count} / ${NTHREADS}))`
@@ -96,9 +96,9 @@ parallel_fastq_dump(){
     fi
     last=$((${last} + ${avg}))
   done
-  echo "blocks: ${out[@]}" >2
+  echo "blocks: ${out[@]}" >&2
 
-  # Run fastq-dump as subprocess
+  # Run fastq-dump and send it to background
   for min_max in "${out[@]}"; do
     local min=`echo ${min_max} | cut -d ',' -f 1`
     local max=`echo ${min_max} | cut -d ',' -f 2`
@@ -110,7 +110,7 @@ parallel_fastq_dump(){
     fastq-dump -N ${min} -X ${max} -O ${d} ${OPTIONS} ${sra} &
   done
 
-  # Collect exit status
+  # Wait subprocesses and collect exit status
   local failure=0
   for job in `jobs -p`; do
     wait $job || let "failure+=1"
@@ -118,7 +118,7 @@ parallel_fastq_dump(){
 
   # Marge splitted fastq files
   if [[ "${failure}" != "0" ]]; then
-    echo "ERROR during decompressing" >2
+    echo "ERROR during decompressing" >&2
     exit 1
   else
     files=($(ls "${td}/1"))
@@ -153,7 +153,7 @@ if [[ ! -z "${SRAID}" ]]; then
 elif [[ ! -z "${FPATH}" ]]; then
   tmpdir="${TMPDIR}/pfd.tmp"
 
-  for srafile in FPATH; do
+  for srafile in ${FPATH}; do
     spot_count=`calc_spot_count "${srafile}"`
     parallel_fastq_dump "${srafile}" "${spot_count}" "${tmpdir}"
   done
@@ -162,3 +162,6 @@ else
   print_help
   exit 0
 fi
+
+# cleaning tmpfiles
+rm -fr "${TMPDIR}/pfd.tmp"
