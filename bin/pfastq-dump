@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
       TMPDIR="${2}"
       shift
       ;;
-    -Z|--stdout
+    -Z|--stdout)
       STDOUT="true"
       ;;
     -*|--*)
