@@ -14,6 +14,13 @@ $ chmod a+x bin/pfastq-dump
 
 then copy/move to wherever you like.
 
+### Prerequisites
+
+Install [sra-tools](https://github.com/ncbi/sra-tools) and make sure two binaries below are in `$PATH`.
+
+- `fastq-dump`
+- `sra-stat`
+
 ## Usage
 
 Basic usage:
@@ -35,3 +42,7 @@ $ pfastq-dump --threads 8 --stdout /path/to/**/*sra > data.fastq
 ```
 
 Mind the disk usage as well as the original implementation warns, this script requires double of decompressed fastq file size.
+
+## Copyright
+
+Copyright (c) 2017 Tazro Inutano Ohta. See LICENSE.txt for further details.
