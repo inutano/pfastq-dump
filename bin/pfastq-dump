@@ -1,13 +1,15 @@
 #!/bin/bash
 #  pfastq-dump: parallelize fastq-dump
 #  Original python implementation: https://github.com/rvalieris/parallel-fastq-dump
+set -e
 
 # pfastq-dump version
 VERSION="0.1.0"
 
-# default tmp/out directory
-TMPDIR="."
-OUTDIR="."
+# default arguments
+TMPDIR="$( cd $( dirname ${BASH_SOURCE[0]} ) && pwd )"
+OUTDIR="${TMPDIR}"
+NTHREADS=1
 
 # parse arguments
 while [[ $# -gt 0 ]]; do
@@ -77,10 +79,9 @@ EOS
 parallel_fastq_dump(){
   local sra="${1}"
   local count="${2}"
-  local tmpdir="${3}"
 
   local sraid=`basename ${sra} | sed -e 's:.sra$::'`
-  local td="${tmpdir}/${sraid}"
+  local td="${TMPDIR}/pfd.tmp/${sraid}"
 
   local avg=`echo $((${count} / ${NTHREADS}))`
   local remain=`echo $((${count} % ${NTHREADS}))`
@@ -156,17 +157,30 @@ calc_spot_count(){
   cut -d ':' -f 1
 }
 
+# function to check prerequisites
+check_binary_location(){
+  local cmd="${1}"
+  local cmd_path=`which ${cmd} 2>/dev/null ||:`
+  if [[ ! -e "${cmd_path}" ]]; then
+    echo "${cmd} not found." >&2
+    exit 1
+  else
+    echo "Using $(${cmd} --version)" >&2
+  fi
+}
+
 # main function
+check_binary_location "sra-stat"
+check_binary_location "fastq-dump"
+
 if [[ ! -z "${SRAID}" ]]; then
   spot_count=`calc_spot_count "${SRAID}"`
   parallel_fastq_dump "${SRAID}" "${spot_count}"
 
 elif [[ ! -z "${FPATH}" ]]; then
-  tmpdir="${TMPDIR}/pfd.tmp"
-
   for srafile in ${FPATH}; do
     spot_count=`calc_spot_count "${srafile}"`
-    parallel_fastq_dump "${srafile}" "${spot_count}" "${tmpdir}"
+    parallel_fastq_dump "${srafile}" "${spot_count}"
   done
 
 else
