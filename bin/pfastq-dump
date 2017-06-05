@@ -4,12 +4,36 @@
 set -e
 
 # pfastq-dump version
-VERSION="0.1.0"
+VERSION="0.1.2"
 
 # default arguments
 TMPDIR="$( cd $( dirname ${BASH_SOURCE[0]} ) && pwd )"
 OUTDIR="${TMPDIR}"
 NTHREADS=1
+
+# functions for version and help
+print_version(){
+  echo "pfastq-dump version $VERSION using fastq-dump " `fastq-dump --version | awk '$1 ~ /^fastq/ { print $3 }'`
+}
+
+print_help(){
+  cat <<EOS
+Usage:
+pfastq-dump --threads <number of threads> [options] <path> [<path>...]
+
+pfastq-dump option:
+-t|--threads         number of threads
+-s|--sra-id          SRA id
+-O|--outdir          output directory
+--tmpdir             temporary directory
+
+Extra arguments will be passed through
+
+Other:
+-v|--version         show version info
+-h|--help            program usage
+EOS
+}
 
 # parse arguments
 while [[ $# -gt 0 ]]; do
@@ -51,29 +75,6 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
-
-print_version(){
-  echo "pfastq-dump version $VERSION using fastq-dump " `fastq-dump --version | awk '$1 ~ /^fastq/ { print $3 }'`
-}
-
-print_help(){
-  cat <<EOS
-Usage:
-pfastq-dump --threads <number of threads> [options] <path> [<path>...]
-
-pfastq-dump option:
--t|--threads         number of threads
--s|--sra-id          SRA id
--O|--outdir          output directory
---tmpdir             temporary directory
-
-Extra arguments will be passed through
-
-Other:
--v|--version         show version info
--h|--help            program usage
-EOS
-}
 
 # function to exec multiple fastq dump
 parallel_fastq_dump(){
@@ -162,10 +163,10 @@ check_binary_location(){
   local cmd="${1}"
   local cmd_path=`which ${cmd} 2>/dev/null ||:`
   if [[ ! -e "${cmd_path}" ]]; then
-    echo "${cmd} not found." >&2
+    echo "ERROR: ${cmd} not found." >&2
     exit 1
   else
-    echo "Using $(${cmd} --version)" >&2
+    echo "Using $(${cmd} --version | tr -d '\n')" >&2
   fi
 }
 
