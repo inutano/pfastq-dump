@@ -4,11 +4,11 @@
 set -e
 
 # pfastq-dump version
-VERSION="0.1.2"
+VERSION="0.1.3"
 
 # default arguments
-TMPDIR="$( cd $( dirname ${BASH_SOURCE[0]} ) && pwd )"
-OUTDIR="${TMPDIR}"
+TMPDIR="$( pwd -P )"
+OUTDIR="$( pwd -P )"
 NTHREADS=1
 
 # functions for version and help
@@ -173,6 +173,9 @@ check_binary_location(){
 # main function
 check_binary_location "sra-stat"
 check_binary_location "fastq-dump"
+
+echo "tmpdir: ${TMPDIR}"
+echo "outdir: ${OUTDIR}"
 
 if [[ ! -z "${SRAID}" ]]; then
   spot_count=`calc_spot_count "${SRAID}"`
