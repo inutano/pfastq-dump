@@ -4,7 +4,7 @@
 set -e
 
 # pfastq-dump version
-VERSION="0.1.4"
+VERSION="0.1.5"
 
 # default arguments
 TMPDIR="$( pwd -P )"
@@ -153,9 +153,13 @@ parallel_fastq_dump(){
 # function to calculate spot count using sra-stat
 calc_spot_count(){
   local sra="${1}"
-  sra-stat --meta --quick "${sra}" |\
-  cut -d '|' -f 3 |\
-  cut -d ':' -f 1
+  local txt=`sra-stat --meta --quick "${sra}"`
+  local total=0
+  for line in ${txt}; do
+    local n=`echo ${line} | cut -d '|' -f 3 | cut -d ':' -f 1`
+    local total=$(( ${total} + ${n} ))
+  done
+  echo ${total}
 }
 
 # function to check prerequisites
