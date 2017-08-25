@@ -4,7 +4,7 @@
 set -e
 
 # pfastq-dump version
-VERSION="0.1.5"
+VERSION="0.1.6"
 
 # default arguments
 TMPDIR="$( pwd -P )"
@@ -70,7 +70,7 @@ while [[ $# -gt 0 ]]; do
       OPTIONS="${OPTIONS} ${1}"
       ;;
     *sra)
-      FPATH="${FPATH} ${1}"
+      INPUT_FILES="${INPUT_FILES} ${1}"
       ;;
   esac
   shift
@@ -81,11 +81,11 @@ parallel_fastq_dump(){
   local sra="${1}"
   local count="${2}"
 
-  local sraid=`basename ${sra} | sed -e 's:.sra$::'`
+  local sraid=$(basename ${sra} | sed -e 's:.sra$::')
   local td="${TMPDIR}/pfd.tmp/${sraid}"
 
-  local avg=`echo $((${count} / ${NTHREADS}))`
-  local remain=`echo $((${count} % ${NTHREADS}))`
+  local avg=$(echo $((${count} / ${NTHREADS})))
+  local remain=$(echo $((${count} % ${NTHREADS})))
 
   local out=()
   local last=1
@@ -105,9 +105,9 @@ parallel_fastq_dump(){
 
   # Run fastq-dump and send it to background
   for min_max in "${out[@]}"; do
-    local min=`echo ${min_max} | cut -d ',' -f 1`
-    local max=`echo ${min_max} | cut -d ',' -f 2`
-    local idx=`echo $(($min / $avg + 1))`
+    local min=$(echo ${min_max} | cut -d ',' -f 1)
+    local max=$(echo ${min_max} | cut -d ',' -f 2)
+    local idx=$(echo $(($min / $avg + 1)))
 
     local d="${td}/${idx}"
     mkdir -p ${d}
@@ -117,8 +117,8 @@ parallel_fastq_dump(){
 
   # Wait subprocesses and collect exit status
   local failure=0
-  for job in `jobs -p`; do
-    wait $job || let "failure+=1"
+  for job in $(jobs -p); do
+    wait ${job} || let "failure+=1"
   done
 
   # Marge splitted fastq files
@@ -136,8 +136,8 @@ parallel_fastq_dump(){
     fi
 
     for min_max in "${out[@]}"; do
-      local min=`echo ${min_max} | cut -d ',' -f 1`
-      local idx=`echo $(($min / $avg + 1))`
+      local min=$(echo ${min_max} | cut -d ',' -f 1)
+      local idx=$(echo $(($min / $avg + 1)))
 
       for fo in "${files[@]}"; do
         if [[ "${STDOUT}" == "true" ]]; then
@@ -153,10 +153,10 @@ parallel_fastq_dump(){
 # function to calculate spot count using sra-stat
 calc_spot_count(){
   local sra="${1}"
-  local txt=`sra-stat --meta --quick "${sra}"`
+  local txt=$(sra-stat --meta --quick "${sra}")
   local total=0
   for line in ${txt}; do
-    local n=`echo ${line} | cut -d '|' -f 3 | cut -d ':' -f 1`
+    local n=$(echo ${line} | cut -d '|' -f 3 | cut -d ':' -f 1)
     local total=$(( ${total} + ${n} ))
   done
   echo ${total}
@@ -165,7 +165,7 @@ calc_spot_count(){
 # function to check prerequisites
 check_binary_location(){
   local cmd="${1}"
-  local cmd_path=`which ${cmd} 2>/dev/null ||:`
+  local cmd_path=$(which ${cmd} 2>/dev/null ||:)
   if [[ ! -e "${cmd_path}" ]]; then
     echo "ERROR: ${cmd} not found." >&2
     exit 1
@@ -181,12 +181,12 @@ check_binary_location "fastq-dump"
 echo "tmpdir: ${TMPDIR}" >&2
 echo "outdir: ${OUTDIR}" >&2
 
-if [[ ! -z "${SRAID}" ]]; then
+if [[ "${SRAID}" ]]; then
   spot_count=`calc_spot_count "${SRAID}"`
   parallel_fastq_dump "${SRAID}" "${spot_count}"
 
-elif [[ ! -z "${FPATH}" ]]; then
-  for srafile in ${FPATH}; do
+elif [[ "${INPUT_FILES}" ]]; then
+  for srafile in ${INPUT_FILES}; do
     spot_count=`calc_spot_count "${srafile}"`
     parallel_fastq_dump "${srafile}" "${spot_count}"
   done
