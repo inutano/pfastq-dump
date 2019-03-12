@@ -1,5 +1,7 @@
 # pfastq-dump
 
+[![DOI](https://zenodo.org/badge/92937657.svg)](https://zenodo.org/badge/latestdoi/92937657)
+
 `pfastq-dump` is a bash implementation of [parallel-fastq-dump](https://github.com/rvalieris/parallel-fastq-dump), parallel `fastq-dump` wrapper. `--stdout` option is additionally supported, but almost same features. It also uses `-N` and `-X` options of fastq-dump to specify blocks of data to be decompressed separately.
 
 ## Install
