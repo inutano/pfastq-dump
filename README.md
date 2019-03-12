@@ -43,6 +43,16 @@ $ pfastq-dump --threads 8 --stdout /path/to/**/*sra > data.fastq
 
 Mind the disk usage as well as the original implementation warns, this script requires double of decompressed fastq file size.
 
+## Docker container
+
+Available on [Quay.io](https://quay.io/repository/inutano/sra-toolkit)
+
+```
+$ ls
+mydata.sra
+$ docker run --rm -v "$(pwd)":/data -w /data quay.io/inutano/sra-toolkit:v2.9.2 pfastq-dump --threads 8 /data/mydata.sra
+```
+
 ## Copyright
 
 Copyright (c) 2017 Tazro Inutano Ohta. See LICENSE.txt for further details.
