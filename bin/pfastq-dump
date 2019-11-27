@@ -7,7 +7,8 @@ set -e
 VERSION="0.1.6"
 
 # default arguments
-TMPDIR="$(pwd -P)"
+TMPDIR=$(mktemp -d)
+trap 'rm -rf ${TMPDIR}' EXIT 1 2 3 15
 OUTDIR="$(pwd -P)"
 NTHREADS=1
 
@@ -195,6 +196,3 @@ else
   print_help
   exit 0
 fi
-
-# cleaning tmpfiles
-rm -fr "${TMPDIR}/pfd.tmp"
