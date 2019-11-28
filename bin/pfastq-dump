@@ -7,16 +7,17 @@ set -e
 VERSION="0.1.6"
 
 # default arguments
-TMPDIR="$( pwd -P )"
-OUTDIR="$( pwd -P )"
+TMPDIR=$(mktemp -d)
+trap 'rm -rf ${TMPDIR}' EXIT 1 2 3 15
+OUTDIR="$(pwd -P)"
 NTHREADS=1
 
 # functions for version and help
-print_version(){
-  echo "pfastq-dump version $VERSION using fastq-dump " `fastq-dump --version | awk '$1 ~ /^fastq/ { print $3 }'`
+print_version() {
+  echo "pfastq-dump version $VERSION using fastq-dump " $(fastq-dump --version | awk '$1 ~ /^fastq/ { print $3 }')
 }
 
-print_help(){
+print_help() {
   cat <<EOS
 Usage:
 pfastq-dump --threads <number of threads> [options] <path> [<path>...]
@@ -39,45 +40,45 @@ EOS
 while [[ $# -gt 0 ]]; do
   key=${1}
   case ${key} in
-    -v|--version)
-      print_version
-      exit 0
-      ;;
-    -h|--help)
-      print_help
-      exit 0
-      ;;
-    -t|--threads)
-      NTHREADS=${2}
-      shift
-      ;;
-    -s|--sra-id)
-      SRAID=${2}
-      shift
-      ;;
-    -O|--outdir)
-      OUTDIR="${2}"
-      shift
-      ;;
-    --tmpdir)
-      TMPDIR="${2}"
-      shift
-      ;;
-    -Z|--stdout)
-      STDOUT="true"
-      ;;
-    -*|--*)
-      OPTIONS="${OPTIONS} ${1}"
-      ;;
-    *sra)
-      INPUT_FILES="${INPUT_FILES} ${1}"
-      ;;
+  -v | --version)
+    print_version
+    exit 0
+    ;;
+  -h | --help)
+    print_help
+    exit 0
+    ;;
+  -t | --threads)
+    NTHREADS=${2}
+    shift
+    ;;
+  -s | --sra-id)
+    SRAID=${2}
+    shift
+    ;;
+  -O | --outdir)
+    OUTDIR="${2}"
+    shift
+    ;;
+  --tmpdir)
+    TMPDIR="${2}"
+    shift
+    ;;
+  -Z | --stdout)
+    STDOUT="true"
+    ;;
+  -* | --*)
+    OPTIONS="${OPTIONS} ${1}"
+    ;;
+  *sra)
+    INPUT_FILES="${INPUT_FILES} ${1}"
+    ;;
   esac
   shift
 done
 
 # function to exec multiple fastq dump
-parallel_fastq_dump(){
+parallel_fastq_dump() {
   local sra="${1}"
   local count="${2}"
 
@@ -92,7 +93,7 @@ parallel_fastq_dump(){
 
   # Calculate blocks per thread
   for i in $(seq ${NTHREADS}); do
-    local spots=$((${last} + ${avg} -1))
+    local spots=$((${last} + ${avg} - 1))
     if [[ ${i} == ${NTHREADS} ]]; then
       plus_remain=$((${spots} + ${remain}))
       out+=("${last},${plus_remain}")
@@ -143,7 +144,7 @@ parallel_fastq_dump(){
         if [[ "${STDOUT}" == "true" ]]; then
           cat "${td}/${idx}/${fo}"
         else
-          cat "${td}/${idx}/${fo}" >> "${OUTDIR}/${fo}"
+          cat "${td}/${idx}/${fo}" >>"${OUTDIR}/${fo}"
         fi
       done
     done
@@ -151,21 +152,21 @@ parallel_fastq_dump(){
 }
 
 # function to calculate spot count using sra-stat
-calc_spot_count(){
+calc_spot_count() {
   local sra="${1}"
   local txt=$(sra-stat --meta --quick "${sra}")
   local total=0
   for line in ${txt}; do
     local n=$(echo ${line} | cut -d '|' -f 3 | cut -d ':' -f 1)
-    local total=$(( ${total} + ${n} ))
+    local total=$((${total} + ${n}))
   done
   echo ${total}
 }
 
 # function to check prerequisites
-check_binary_location(){
+check_binary_location() {
   local cmd="${1}"
-  local cmd_path=$(which ${cmd} 2>/dev/null ||:)
+  local cmd_path=$(which ${cmd} 2>/dev/null || :)
   if [[ ! -e "${cmd_path}" ]]; then
     echo "ERROR: ${cmd} not found." >&2
     exit 1
@@ -182,12 +183,12 @@ echo "tmpdir: ${TMPDIR}" >&2
 echo "outdir: ${OUTDIR}" >&2
 
 if [[ "${SRAID}" ]]; then
-  spot_count=`calc_spot_count "${SRAID}"`
+  spot_count=$(calc_spot_count "${SRAID}")
   parallel_fastq_dump "${SRAID}" "${spot_count}"
 
 elif [[ "${INPUT_FILES}" ]]; then
   for srafile in ${INPUT_FILES}; do
-    spot_count=`calc_spot_count "${srafile}"`
+    spot_count=$(calc_spot_count "${srafile}")
     parallel_fastq_dump "${srafile}" "${spot_count}"
   done
 
@@ -195,6 +196,3 @@ else
   print_help
   exit 0
 fi
-
-# cleaning tmpfiles
-rm -fr "${TMPDIR}/pfd.tmp"
